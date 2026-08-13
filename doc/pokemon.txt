@@ -81,7 +81,8 @@ Defaults: >lua
     wander = { step_chance = 0.55, idle_chance = 0.06, idle_ticks = { 8, 32 } },
     chat = { chance = 0.02, cooldown_sec = 45, duration_sec = 4 },
     angry = { duration_sec = 2.5 },
-    emotes = { idle_chance = 0.005 },  -- random mood bubbles (hearts, zzz...)
+    emotes = { every_sec = 60 },       -- ~one ambient mood bubble per minute
+                                       -- across the party; 0 disables
     grass = { enabled = false, density = 0.55, zone = 0.4 },
     backend = "auto",      -- "auto" | "kitty" | "float"
     respawn_delay_sec = 2,

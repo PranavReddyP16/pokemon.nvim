@@ -95,14 +95,27 @@ local function emote_cells(a)
   return { w = math.max(2, math.ceil(a.w / 2)), h = math.max(1, math.ceil(a.h / 2)) }
 end
 
+--- Emote spot: above the head, else below the feet, else beside — but only
+--- where the grid says the cells are blank. Returns nil when every candidate
+--- would sit on text: no bubble is better than a bubble over code.
 local function emote_pos(a)
   local e = emote_cells(a)
-  local c = util.clamp(a.pos.c + math.floor((a.w - e.w) / 2), 1, vim.o.columns - e.w)
-  if a.pos.r > e.h then
-    return { r = a.pos.r - e.h, c = c } -- directly above the head
+  local grid = state.grid
+  local cx = util.clamp(a.pos.c + math.floor((a.w - e.w) / 2), 1, vim.o.columns - e.w + 1)
+  local candidates = {
+    { r = a.pos.r - e.h, c = cx }, -- above the head
+    { r = a.pos.r + a.h, c = cx }, -- below the feet
+    { r = a.pos.r, c = a.pos.c + a.w + 1 }, -- right side
+    { r = a.pos.r, c = a.pos.c - e.w - 1 }, -- left side
+  }
+  for _, p in ipairs(candidates) do
+    if not grid or grid:fits(p.r, p.c, e.w, e.h) then
+      return p, e
+    end
   end
-  return { r = a.pos.r + a.h, c = c } -- no room above: show below
+  return nil, e
 end
+M._emote_pos = emote_pos -- exposed for tests
 
 --- The pokeball sits on the actor's bottom row, centered on the footprint.
 local function ball_pos(a)
@@ -186,14 +199,15 @@ local function ops_for_actor(a, ops)
       direction = a.dir, -- used by the float backend only
     }
   end
+  local epos = a.emote and emote_pos(a) or nil
   for kind, img in pairs(IMG_EMOTE) do
-    if a.emote and a.emote.kind == kind then
+    if a.emote and a.emote.kind == kind and epos then
       b.ensure_image(img, plugin_root .. "/assets/emotes/" .. kind .. ".png")
       ops[#ops + 1] = {
         kind = "place",
         image_id = img,
         placement_id = a.id,
-        pos = emote_pos(a),
+        pos = epos,
         rect = { x = 0, y = 0, w = 32, h = 32 },
         cells = emote_cells(a),
         z = b.Z_EMOTE,
@@ -562,6 +576,22 @@ local function tick()
     a:tick(ctx)
   end
   respawn_scan()
+
+  -- ambient mood bubble: on average ONE across the whole party per
+  -- emotes.every_sec, regardless of how many pokemon are out
+  local every = config.options.emotes.every_sec or 60
+  if every > 0 and util.chance(1 / (every * config.options.fps)) then
+    local candidates = {}
+    for _, a in ipairs(state.actors) do
+      if a.state == actor_mod.STATES.WANDER and not a.emote then
+        candidates[#candidates + 1] = a
+      end
+    end
+    local lucky = util.pick(candidates)
+    if lucky then
+      lucky:set_emote(lucky.idle_ticks > 0 and "zzz" or util.pick(actor_mod.IDLE_EMOTES), 12)
+    end
+  end
 
   local ops = {}
   if rebuilt then

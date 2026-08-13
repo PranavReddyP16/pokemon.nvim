@@ -19,8 +19,9 @@ M.defaults = {
     duration_sec = 4,
   },
   angry = { duration_sec = 2.5 },
-  -- random mood bubbles while wandering/idling (hearts, notes, zzz...)
-  emotes = { idle_chance = 0.005 }, -- per tick; ~every 25s per pokemon at 8fps
+  -- ambient mood bubbles (hearts, notes, zzz...): on average one across the
+  -- whole party per every_sec seconds; 0 disables them
+  emotes = { every_sec = 60 },
   -- tall grass field below the text — OFF by default; toggle at runtime with
   -- :Pokemon grass. density = fraction of route "super cells" that grow a
   -- patch (0 = none, 1 = solid field). zone = the bottom fraction of each

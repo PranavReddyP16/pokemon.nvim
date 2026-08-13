@@ -182,12 +182,8 @@ function Actor:tick(ctx)
     return
   end
 
-  -- wander: occasionally a mood bubble pops up out of nowhere, like a
-  -- follower in the games (zzz when parked, anything else on the move)
-  if not self.emote and util.chance(ctx.cfg.emotes.idle_chance) then
-    local kind = self.idle_ticks > 0 and "zzz" or util.pick(M.IDLE_EMOTES)
-    self:set_emote(kind, 12)
-  end
+  -- wander (ambient mood bubbles are rolled by the world, not per actor —
+  -- a per-actor rate would scale with party size)
   if self.idle_ticks > 0 then
     self.idle_ticks = self.idle_ticks - 1
     idle_animate(self)
