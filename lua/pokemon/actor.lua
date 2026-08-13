@@ -12,7 +12,23 @@ M.Actor = Actor
 
 local next_id = 1
 
-M.STATES = { WANDER = "wander", ANGRY = "angry", CHAT = "chat", GONE = "gone" }
+M.STATES = {
+  WANDER = "wander",
+  ANGRY = "angry",
+  CHAT = "chat",
+  GONE = "gone",
+  -- pokeball ceremony: spawn shows ball -> burst -> pokemon; despawn plays
+  -- it backwards (burst -> ball -> gone), like a trainer recall
+  MATERIALIZING = "materializing",
+  RETURNING = "returning",
+}
+
+-- materialize: ball while state_ticks > BURST_TICKS, then burst
+M.MATERIALIZE_TICKS = 7
+-- return: burst for the first RETURN_TICKS - RETURN_BALL_TICKS, then ball
+M.RETURN_TICKS = 6
+M.RETURN_BALL_TICKS = 4
+M.BURST_TICKS = 2
 
 function M.new(dex, shiny, image_id, pos, footprint)
   local a = setmetatable({
@@ -26,8 +42,8 @@ function M.new(dex, shiny, image_id, pos, footprint)
     h = footprint.h,
     dir = "down",
     frame = 0,
-    state = M.STATES.WANDER,
-    state_ticks = 0,
+    state = M.STATES.MATERIALIZING,
+    state_ticks = M.MATERIALIZE_TICKS,
     idle_ticks = 0,
     target = nil,
     emote = nil, -- { kind, ticks }
@@ -136,6 +152,19 @@ function Actor:tick(ctx)
     return
   end
 
+  if self.state == M.STATES.MATERIALIZING or self.state == M.STATES.RETURNING then
+    self.state_ticks = self.state_ticks - 1
+    self.dirty = true -- ball/burst phase changes every tick
+    if self.state_ticks <= 0 then
+      if self.state == M.STATES.MATERIALIZING then
+        self.state = M.STATES.WANDER
+      else
+        self.state = M.STATES.GONE
+      end
+    end
+    return
+  end
+
   if self.state == M.STATES.ANGRY or self.state == M.STATES.CHAT then
     self.state_ticks = self.state_ticks - 1
     if self.state_ticks <= 0 then
@@ -209,6 +238,19 @@ function Actor:push(ctx)
   self.frame = 0
   self:set_emote("angry", self.state_ticks)
   return "moved"
+end
+
+--- Recall into the pokeball (animated despawn). The world removes us once
+--- the animation reaches GONE.
+function Actor:recall()
+  if self.state == M.STATES.GONE or self.state == M.STATES.RETURNING then
+    return
+  end
+  self.state = M.STATES.RETURNING
+  self.state_ticks = M.RETURN_TICKS
+  self.emote = nil
+  self.target = nil
+  self.dirty = true
 end
 
 --- Enter chat state facing a partner.

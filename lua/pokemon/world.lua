@@ -15,6 +15,8 @@ local ID_BASE = 210000
 local ID_SHINY_OFFSET = 1000
 local IMG_GRASS = ID_BASE + 9000
 local IMG_EMOTE = { angry = ID_BASE + 9001, chat = ID_BASE + 9002, note = ID_BASE + 9003 }
+local IMG_BALL = ID_BASE + 9004
+local IMG_BURST = ID_BASE + 9005
 -- emote placements live on the emote images keyed by actor id; grass
 -- placements live on the grass image keyed by patch id
 
@@ -93,25 +95,88 @@ local function emote_pos(a)
   return { r = a.pos.r + a.h, c = c } -- no room above: show below
 end
 
+--- The pokeball sits on the actor's bottom row, centered on the footprint.
+local function ball_pos(a)
+  return {
+    r = a.pos.r + a.h - 1,
+    c = util.clamp(a.pos.c + math.floor((a.w - 2) / 2), 1, vim.o.columns - 1),
+  }
+end
+
+--- Which visual the actor shows this tick: the pokeball, the materialize
+--- burst, or the sprite itself (see the ceremony timelines in actor.lua).
+local function actor_visual(a)
+  local S = actor_mod.STATES
+  if a.state == S.MATERIALIZING then
+    return a.state_ticks > actor_mod.BURST_TICKS and "ball" or "burst"
+  end
+  if a.state == S.RETURNING then
+    return a.state_ticks > actor_mod.RETURN_BALL_TICKS and "burst" or "ball"
+  end
+  return "sprite"
+end
+
 local function ops_for_actor(a, ops)
   local b = state.backend
+  local function delete(img)
+    ops[#ops + 1] = { kind = "delete", image_id = img, placement_id = a.id }
+  end
+
   if a.state == actor_mod.STATES.GONE then
-    ops[#ops + 1] = { kind = "delete", image_id = a.image_id, placement_id = a.id }
+    delete(a.image_id)
+    delete(IMG_BALL)
+    delete(IMG_BURST)
     for _, img in pairs(IMG_EMOTE) do
-      ops[#ops + 1] = { kind = "delete", image_id = img, placement_id = a.id }
+      delete(img)
     end
     return
   end
-  ops[#ops + 1] = {
-    kind = "place",
-    image_id = a.image_id,
-    placement_id = a.id,
-    pos = a.pos,
-    rect = sprites.frame_rect(a.dir, a.frame),
-    cells = sprite_cells(),
-    z = b.Z_POKEMON,
-    direction = a.dir, -- used by the float backend only
-  }
+
+  -- exactly one of sprite/ball/burst is visible; deleting the other two is
+  -- cheap (the kitty backend skips deletes of placements that don't exist)
+  local visual = actor_visual(a)
+  if visual == "ball" then
+    b.ensure_image(IMG_BALL, plugin_root .. "/assets/pokeball.png")
+    delete(a.image_id)
+    delete(IMG_BURST)
+    ops[#ops + 1] = {
+      kind = "place",
+      image_id = IMG_BALL,
+      placement_id = a.id,
+      pos = ball_pos(a),
+      rect = { x = 0, y = 0, w = 30, h = 30 },
+      cells = { w = 2, h = 1 },
+      z = b.Z_POKEMON,
+      emote = "ball",
+    }
+  elseif visual == "burst" then
+    b.ensure_image(IMG_BURST, plugin_root .. "/assets/burst.png")
+    delete(a.image_id)
+    delete(IMG_BALL)
+    ops[#ops + 1] = {
+      kind = "place",
+      image_id = IMG_BURST,
+      placement_id = a.id,
+      pos = a.pos,
+      rect = { x = (a.state_ticks % 2) * 32, y = 0, w = 32, h = 32 },
+      cells = sprite_cells(),
+      z = b.Z_POKEMON,
+      emote = "burst",
+    }
+  else
+    delete(IMG_BALL)
+    delete(IMG_BURST)
+    ops[#ops + 1] = {
+      kind = "place",
+      image_id = a.image_id,
+      placement_id = a.id,
+      pos = a.pos,
+      rect = sprites.frame_rect(a.dir, a.frame),
+      cells = sprite_cells(),
+      z = b.Z_POKEMON,
+      direction = a.dir, -- used by the float backend only
+    }
+  end
   for kind, img in pairs(IMG_EMOTE) do
     if a.emote and a.emote.kind == kind then
       b.ensure_image(img, plugin_root .. "/assets/emotes/" .. kind .. ".png")
@@ -371,17 +436,13 @@ function M.despawn(id)
   if not state.backend then
     return -- world never started; nothing can be on screen
   end
-  local ops = {}
+  -- recall animation (burst -> ball -> gone); the tick loop renders it and
+  -- removes the actor once the animation lands on GONE
   for _, a in ipairs(state.actors) do
     if id == nil or a.name == tostring(id):lower() or tostring(a.dex) == tostring(id) then
-      a.state = actor_mod.STATES.GONE
-      ops_for_actor(a, ops)
+      a:recall()
     end
   end
-  state.backend.flush(ops)
-  state.actors = vim.tbl_filter(function(a)
-    return a.state ~= actor_mod.STATES.GONE
-  end, state.actors)
 end
 
 -- ---------------------------------------------------------------------------
@@ -421,9 +482,15 @@ end
 local function collision_sweep(ctx)
   for _, a in ipairs(state.actors) do
     if a.state ~= actor_mod.STATES.GONE and not ctx.grid:fits(a.pos.r, a.pos.c, a.w, a.h) then
-      local result = a:push(ctx)
-      if result == "gone" then
-        state.respawn_queue[#state.respawn_queue + 1] = { dex = a.dex, shiny = a.shiny }
+      if a.state == actor_mod.STATES.RETURNING then
+        -- already leaving; text reached it first — vanish now, no drama
+        a.state = actor_mod.STATES.GONE
+        a.dirty = true
+      else
+        local result = a:push(ctx)
+        if result == "gone" then
+          state.respawn_queue[#state.respawn_queue + 1] = { dex = a.dex, shiny = a.shiny }
+        end
       end
     end
   end
@@ -636,6 +703,8 @@ function M.hide()
   local ops = {}
   for _, a in ipairs(state.actors) do
     ops[#ops + 1] = { kind = "delete", image_id = a.image_id, placement_id = a.id }
+    ops[#ops + 1] = { kind = "delete", image_id = IMG_BALL, placement_id = a.id }
+    ops[#ops + 1] = { kind = "delete", image_id = IMG_BURST, placement_id = a.id }
     for _, img in pairs(IMG_EMOTE) do
       ops[#ops + 1] = { kind = "delete", image_id = img, placement_id = a.id }
     end

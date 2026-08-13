@@ -175,8 +175,16 @@ is present.
 
 ## Actors
 
-FSM per pokemon (`actor.lua`): `wander ⇄ chat`, `wander → angry → wander`,
-`any → gone`.
+FSM per pokemon (`actor.lua`): `materializing → wander ⇄ chat`,
+`wander → angry → wander`, `any → returning → gone` (or straight to `gone`
+on push-with-nowhere-to-go).
+
+- **Pokeball ceremony**: spawning shows the pokeball on the footprint's
+  bottom row (5 ticks), then a 2-frame burst flash, then the sprite —
+  a recall (`actor:recall()`, used by despawn) plays it backwards. Rendering
+  picks exactly one visual per tick (`actor_visual`: ball/burst/sprite) and
+  deletes the other two placements; text reaching a RETURNING actor skips
+  the rest of the animation.
 
 - **Wander**: pick a free target within radius, step 1 cell/tick toward it
   (horizontal preferred; vertical steps at half rate because cells are ~2x

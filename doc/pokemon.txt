@@ -95,6 +95,8 @@ grow (0.4 = the deepest 40%; nothing ever grows nearer your code).
 
 - Pokemon walk only on provably blank cells (right of line ends, empty
   lines, below the last line). Unknown screen content counts as occupied.
+- Spawning pokemon come out of a pokeball (ball, burst flash, pokemon);
+  despawning recalls them the same way in reverse.
 - Typing into a pokemon's cell pushes it to the rightmost fit on that row
   (else the nearest free spot, else it leaves and respawns when space
   stabilizes), then it faces the screen with an angry emote.

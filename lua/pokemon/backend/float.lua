@@ -34,7 +34,7 @@ local ART = {
   },
 }
 
-local EMOJI = { angry = "💢", chat = "💬", note = "♪ ", grass = "🌿" }
+local EMOJI = { angry = "💢", chat = "💬", note = "♪ ", grass = "🌿", ball = "◓ ", burst = "✦ " }
 
 local function key(image_id, placement_id)
   return image_id .. ":" .. placement_id
