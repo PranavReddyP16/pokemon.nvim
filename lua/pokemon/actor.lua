@@ -30,6 +30,10 @@ M.RETURN_TICKS = 6
 M.RETURN_BALL_TICKS = 4
 M.BURST_TICKS = 2
 
+-- emote vocabularies (each name is an assets/emotes/<name>.png)
+M.CHAT_EMOTES = { "chat", "note", "heart", "exclaim", "question" }
+M.IDLE_EMOTES = { "note", "heart", "question", "sweat", "exclaim" }
+
 function M.new(dex, shiny, image_id, pos, footprint)
   local a = setmetatable({
     id = next_id,
@@ -170,12 +174,20 @@ function Actor:tick(ctx)
     if self.state_ticks <= 0 then
       self.state = M.STATES.WANDER
       self.dirty = true
+    elseif self.state == M.STATES.CHAT and util.chance(0.1) then
+      -- conversations move: swap bubbles mid-chat
+      self:set_emote(util.pick(M.CHAT_EMOTES), math.min(self.state_ticks, 10))
     end
     idle_animate(self)
     return
   end
 
-  -- wander
+  -- wander: occasionally a mood bubble pops up out of nowhere, like a
+  -- follower in the games (zzz when parked, anything else on the move)
+  if not self.emote and util.chance(ctx.cfg.emotes.idle_chance) then
+    local kind = self.idle_ticks > 0 and "zzz" or util.pick(M.IDLE_EMOTES)
+    self:set_emote(kind, 12)
+  end
   if self.idle_ticks > 0 then
     self.idle_ticks = self.idle_ticks - 1
     idle_animate(self)

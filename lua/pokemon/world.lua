@@ -14,7 +14,16 @@ local M = {}
 local ID_BASE = 210000
 local ID_SHINY_OFFSET = 1000
 local IMG_GRASS = ID_BASE + 9000
-local IMG_EMOTE = { angry = ID_BASE + 9001, chat = ID_BASE + 9002, note = ID_BASE + 9003 }
+local IMG_EMOTE = {
+  angry = ID_BASE + 9001,
+  chat = ID_BASE + 9002,
+  note = ID_BASE + 9003,
+  heart = ID_BASE + 9006,
+  exclaim = ID_BASE + 9007,
+  question = ID_BASE + 9008,
+  zzz = ID_BASE + 9009,
+  sweat = ID_BASE + 9010,
+}
 local IMG_BALL = ID_BASE + 9004
 local IMG_BURST = ID_BASE + 9005
 -- emote placements live on the emote images keyed by actor id; grass
@@ -466,9 +475,8 @@ local function chat_scan(ctx)
         and (state.chat_cooldown[pair_key(a, b)] or 0) <= state.tick_count
         and util.chance(cfg.chance)
       then
-        local kind_a = util.chance(0.25) and "note" or "chat"
-        a:chat_with(b, ctx, kind_a)
-        b:chat_with(a, ctx, "chat")
+        a:chat_with(b, ctx, util.pick(actor_mod.CHAT_EMOTES))
+        b:chat_with(a, ctx, util.pick(actor_mod.CHAT_EMOTES))
         state.chat_cooldown[pair_key(a, b)] = state.tick_count + math.floor(cfg.cooldown_sec * config.options.fps)
       end
     end

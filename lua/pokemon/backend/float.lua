@@ -34,7 +34,19 @@ local ART = {
   },
 }
 
-local EMOJI = { angry = "💢", chat = "💬", note = "♪ ", grass = "🌿", ball = "◓ ", burst = "✦ " }
+local EMOJI = {
+  angry = "💢",
+  chat = "💬",
+  note = "♪ ",
+  grass = "🌿",
+  ball = "◓ ",
+  burst = "✦ ",
+  heart = "❤ ",
+  exclaim = "❗",
+  question = "❓",
+  zzz = "💤",
+  sweat = "💧",
+}
 
 local function key(image_id, placement_id)
   return image_id .. ":" .. placement_id
