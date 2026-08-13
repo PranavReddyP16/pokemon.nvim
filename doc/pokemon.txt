@@ -1,0 +1,116 @@
+*pokemon.txt*  Gen 4 pokemon wandering the empty parts of your screen
+
+Author: Pranav (PranavReddyP16)
+License: MIT (code); Pokémon assets are © Nintendo/Game Freak, downloaded
+to your machine and never distributed with this plugin.
+
+==============================================================================
+CONTENTS                                                     *pokemon-contents*
+
+  1. Introduction ......................... |pokemon-introduction|
+  2. Requirements ......................... |pokemon-requirements|
+  3. Setup ................................ |pokemon-setup|
+  4. Commands ............................. |pokemon-commands|
+  5. Options .............................. |pokemon-options|
+  6. Behavior ............................. |pokemon-behavior|
+  7. Limitations .......................... |pokemon-limitations|
+
+==============================================================================
+1. INTRODUCTION                                          *pokemon-introduction*
+
+Gen 4 (HGSS) pokemon overworld sprites wander the EMPTY cells of your
+editor. When your code grows into the space one is standing on, it is
+pushed to the end of the row, turns to face you, and shows an angry emote.
+Adjacent pokemon sometimes chat. An optional tall-grass field grows in the
+empty space below your code, and rustles when walked through.
+
+Sprites render through the kitty graphics protocol BELOW text glyphs — a
+pokemon can never cover your code.
+
+==============================================================================
+2. REQUIREMENTS                                          *pokemon-requirements*
+
+- neovim 0.10+
+- kitty, ghostty, or wezterm for pixel sprites (other terminals get a
+  floating-window fallback; tmux is not supported yet)
+- curl (sprite downloads)
+
+Run `:checkhealth pokemon` to verify.
+
+==============================================================================
+3. SETUP                                                        *pokemon-setup*
+
+The `:Pokemon` command works with no setup at all. Call setup() to change
+options or enable auto-start. lazy.nvim: >lua
+
+  {
+    "PranavReddyP16/pokemon.nvim",
+    event = "VeryLazy",
+    opts = { roster = { "turtwig", "chimchar", "piplup" } },
+  }
+<
+==============================================================================
+4. COMMANDS                                                  *:Pokemon* *pokemon-commands*
+
+  :Pokemon                       toggle the world on/off
+  :Pokemon spawn [names...]      add pokemon (random installed if omitted;
+                                 offers to download missing sheets)
+  :Pokemon despawn [names...]    remove by name/dex (all if omitted)
+  :Pokemon install {args...}     download sheets: names, dex numbers,
+                                 gen1..gen4, all; append "shiny" for shinies
+  :Pokemon grass                 toggle the tall grass field
+  :Pokemon status                actors, positions, backend, tick timings
+  :Pokemon cleanup               stop and delete all terminal image data
+
+Names and sets tab-complete.
+
+==============================================================================
+5. OPTIONS                                                    *pokemon-options*
+
+Defaults: >lua
+
+  require("pokemon").setup({
+    auto_start = true,     -- start with the editor (setup() callers only)
+    count = 3,             -- pokemon at startup
+    max_actors = 10,       -- hard cap, spawns + respawns included
+    roster = { "turtwig", "chimchar", "piplup" },
+    shiny = false,         -- true | false | "sometimes" (~5%)
+    size = "medium",       -- "small" 2x1 | "medium" 4x2 | "large" 5x3
+                           -- | { w = 6, h = 3 } custom cells
+    fps = 8,
+    wander = { step_chance = 0.55, idle_chance = 0.06, idle_ticks = { 8, 32 } },
+    chat = { chance = 0.02, cooldown_sec = 45, duration_sec = 4 },
+    angry = { duration_sec = 2.5 },
+    grass = { enabled = false, density = 0.55, zone = 0.4 },
+    backend = "auto",      -- "auto" | "kitty" | "float"
+    respawn_delay_sec = 2,
+  })
+<
+grass.density: fraction of route "super-cells" that grow a patch.
+grass.zone: bottom fraction of each window's empty space where grass may
+grow (0.4 = the deepest 40%; nothing ever grows nearer your code).
+
+==============================================================================
+6. BEHAVIOR                                                  *pokemon-behavior*
+
+- Pokemon walk only on provably blank cells (right of line ends, empty
+  lines, below the last line). Unknown screen content counts as occupied.
+- Typing into a pokemon's cell pushes it to the rightmost fit on that row
+  (else the nearest free spot, else it leaves and respawns when space
+  stabilizes), then it faces the screen with an angry emote.
+- Two adjacent wandering pokemon occasionally stop and chat.
+- Standing pokemon keep animating (wing flaps, marching in place), like
+  followers in the games.
+- Sheets download on demand to stdpath("data")/pokemon.nvim/sprites/.
+
+==============================================================================
+7. LIMITATIONS                                            *pokemon-limitations*
+
+- tmux: no graphics passthrough yet; the float fallback is used.
+- The sprite source is missing 29 pokemon (mostly legendaries, e.g. mew,
+  lugia, ho-oh, celebi, dialga, palkia, arceus). Installs skip them with a
+  notice. The legendary birds/beasts exist only as shinies and are spawned
+  as such.
+- Wrapped lines are treated as fully occupied (conservative by design).
+
+vim:tw=78:ts=8:noet:ft=help:norl:
